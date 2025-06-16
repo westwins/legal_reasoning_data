@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal 서비스의 인공지능 도입 전략 - Legal Reasoning과 Data</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Scholarly Warmth -->
+    <!-- Application Structure Plan: The application is designed as a guided, four-part seminar presentation. The structure follows a clear narrative: 1. The Challenge (Why legal reasoning is unique), 2. The Blueprint (Past computational models), 3. The Core Strategy (Data tagging for modern CoT LLMs), and 4. The Future Vision (Cognitive Computing Legal Apps). This sequential, slide-like flow is chosen over a dense dashboard to facilitate a clear, step-by-step presentation for a 30-minute seminar. Each section uses interactive elements (cards, charts, toggles) to make complex information digestible and engaging for the audience, guiding them from the core problem to the proposed solution and its future implications. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Unique nature of legal reasoning (P vs ~P, non-monotonicity) -> Goal: Contrast & Inform -> Viz/Presentation: HTML/CSS comparison diagram -> Interaction: Static visual aid -> Justification: Immediately establishes the seminar's core problem in a visually intuitive way.
+        - Report Info: Various computational legal models (HYPO, CATO, VJAP) -> Goal: Organize & Explain -> Viz/Presentation: Clickable info cards -> Interaction: Click to reveal details -> Justification: Breaks down dense academic concepts into manageable, user-driven chunks, preventing information overload.
+        - Report Info: LUIMA tagging system & sentence types -> Goal: Emphasize Composition -> Viz/Presentation: Chart.js Doughnut Chart -> Interaction: Hover for tooltips showing percentages -> Justification: Visually quantifies the building blocks of a well-annotated legal text, reinforcing the central thesis about the importance of a structured tagging strategy. Library: Chart.js.
+        - Report Info: Overcoming tagging challenges (Data sparsity, ambiguity) -> Goal: Organize & Compare Solutions -> Viz/Presentation: Interactive toggle/tabbed content -> Interaction: Click buttons to switch content view -> Justification: Presents complex problem-solution pairs in a clean, interactive format that is easy to follow and compare.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        .section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            scroll-snap-align: start;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        .section.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 60rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        .nav-button {
+            position: fixed;
+            bottom: 2rem;
+            background-color: #4A5568;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            z-index: 50;
+        }
+        .nav-button:hover {
+            background-color: #2D3748;
+        }
+        #prevBtn {
+            left: 2rem;
+        }
+        #nextBtn {
+            right: 2rem;
+        }
+        .chart-container {
+            position: relative; 
+            width: 100%; 
+            max-width: 450px; 
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 450px;
+            max-height: 80vh;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+    <main id="app-container">
+
+        <!-- Section 1: Introduction -->
+        <section id="section-1" class="section active p-6">
+            <div class="text-center w-full max-w-4xl mx-auto">
+                <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">Legal 서비스의 AI 도입 전략</h1>
+                <h2 class="text-2xl md:text-3xl font-light text-indigo-600 mb-8">법률 추론(Legal Reasoning)과 데이터</h2>
+                <p class="text-lg text-gray-600 mb-12">
+                    본 발표는 상용 LLM이 법률 분야에 적용될 때 직면하는 근본적인 한계를 분석하고, 법률 추론의 고유한 특성을 학습시키기 위한 데이터 구축 및 태깅 전략을 제시합니다. 왜 법률 AI는 다른 접근법이 필요한지, 그리고 어떻게 그 간극을 메울 수 있는지 함께 탐색해 보겠습니다.
+                </p>
+                <div class="grid md:grid-cols-3 gap-8 text-left">
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-xl font-bold mb-2 text-indigo-700">1. The Challenge</h3>
+                        <p class="text-gray-600">법률 추론은 과학/수학적 추론과 어떻게 다른가?</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-xl font-bold mb-2 text-indigo-700">2. The Blueprint</h3>
+                        <p class="text-gray-600">과거의 계산 모델에서 얻는 교훈과 통찰</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-xl font-bold mb-2 text-indigo-700">3. The Strategy</h3>
+                        <p class="text-gray-600">성공적인 법률 CoT LLM을 위한 데이터 태깅 전략</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: The Challenge of Legal Reasoning -->
+        <section id="section-2" class="section p-6">
+            <div class="w-full max-w-6xl mx-auto">
+                <h2 class="text-3xl md:text-4xl font-bold text-center mb-4">법률 추론의 본질적 차이</h2>
+                <p class="text-xl text-gray-600 text-center mb-12">일반 LLM이 훈련된 과학/수학적 추론과 달리, 법률 추론은 모호함, 불확정성, 반박 가능성을 내포합니다.</p>
+                
+                <div class="grid md:grid-cols-2 gap-8 items-start">
+                    <div class="bg-white p-8 rounded-lg border border-gray-200">
+                        <h3 class="text-2xl font-bold mb-4 text-center">과학/수학적 추론 (상용 LLM)</h3>
+                        <ul class="space-y-4 text-lg">
+                            <li class="flex items-start">
+                                <span class="text-green-500 mr-3 mt-1">✓</span>
+                                <div><strong class="font-semibold text-gray-800">단조성 (Monotonicity):</strong> 새로운 정보가 추가되어도 기존 결론은 바뀌지 않습니다.</div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-green-500 mr-3 mt-1">✓</span>
+                                <div><strong class="font-semibold text-gray-800">일관성 (Consistency):</strong> P와 ~P는 동시에 참이 될 수 없습니다. (모순 배제)</div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-green-500 mr-3 mt-1">✓</span>
+                                <div><strong class="font-semibold text-gray-800">절대적 진리:</strong> 한번 증명된 결론은 절대적입니다.</div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="bg-indigo-50 p-8 rounded-lg border border-indigo-200">
+                        <h3 class="text-2xl font-bold mb-4 text-center text-indigo-800">법률 추론 (Legal Reasoning)</h3>
+                         <ul class="space-y-4 text-lg">
+                            <li class="flex items-start">
+                                <span class="text-red-500 mr-3 mt-1">✗</span>
+                                <div><strong class="font-semibold text-indigo-800">비단조성 (Non-Monotonicity):</strong> 새로운 사실(판례)이 나타나면 기존 결론이 뒤집힐 수 있습니다.</div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-red-500 mr-3 mt-1">✗</span>
+                                <div><strong class="font-semibold text-indigo-800">불확정성 (Indeterminacy):</strong> P(원고 승)와 ~P(피고 승)를 지지하는 합리적 논증이 동시에 존재할 수 있습니다.</div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-red-500 mr-3 mt-1">✗</span>
+                                <div><strong class="font-semibold text-indigo-800">반박 가능성 (Defeasibility):</strong> 모든 결론은 잠정적이며, 예외적인 상황에 의해 반박될 수 있습니다.</div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-center mt-10 text-lg text-gray-700">이러한 특성 때문에 법률 추론용 AI는 단순히 방대한 텍스트를 학습하는 것을 넘어, 논증의 구조, 가치, 목적까지 이해해야 합니다.</p>
+            </div>
+        </section>
+
+        <!-- Section 3: The Blueprint (Computational Models) -->
+        <section id="section-3" class="section p-6">
+            <div class="w-full max-w-6xl mx-auto text-center">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">과거의 청사진: 계산 법률 모델</h2>
+                <p class="text-xl text-gray-600 mb-12">
+                    LLM 이전의 AI 연구는 법률 추론을 계산적으로 모델링하려는 시도를 통해 귀중한 통찰을 남겼습니다.<br>이 모델들은 법률 추론에 필요한 지식의 종류와 구조에 대한 '청사진'을 제공합니다.
+                </p>
+                <div id="models-container" class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Cards will be injected by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: The Core Strategy (Tagging) -->
+        <section id="section-4" class="section p-6">
+            <div class="w-full max-w-6xl mx-auto">
+                <h2 class="text-3xl md:text-4xl font-bold text-center mb-4">핵심 전략: 데이터와 태깅</h2>
+                <p class="text-xl text-gray-600 text-center mb-12">
+                    우수한 법률 CoT LLM을 만들기 위한 핵심은 '어떤 데이터를' '어떻게 태깅하여' 학습시키느냐에 달려있습니다.<br> LUIMA와 같은 정교한 유형 시스템은 법률 문서의 의미론적, 논증적 구조를 포착하는 데 필수적입니다.
+                </p>
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    <div class="chart-container">
+                        <canvas id="luimaChart"></canvas>
+                        <p class="text-center mt-4 text-sm text-gray-600">가상 법률 문서의 논증 구조 구성 요소</p>
+                    </div>
+                    <div id="tagging-challenges-container">
+                        <h3 class="text-2xl font-bold mb-6 text-center">주요 태깅 과제와 극복 전략</h3>
+                        <div class="flex justify-center mb-6">
+                            <!-- Buttons will be injected by JS -->
+                        </div>
+                        <div id="challenge-content" class="bg-white p-6 rounded-lg border border-gray-200 min-h-[250px]">
+                            <!-- Content will be injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section 5: Future Vision -->
+        <section id="section-5" class="section p-6">
+            <div class="w-full max-w-4xl mx-auto text-center">
+                 <h2 class="text-3xl md:text-4xl font-bold mb-4">미래 비전: 인지 컴퓨팅 법률 앱 (CCLA)</h2>
+                <p class="text-xl text-gray-600 mb-12">
+                    미래의 법률 AI는 단순히 답변을 제공하는 것을 넘어, 법률 전문가가 '법률 가설'을 세우고, 테스트하며, 정교화하는 과정을 돕는 지능형 파트너가 될 것입니다.
+                </p>
+                
+                <div class="space-y-8">
+                    <div class="bg-white p-8 rounded-lg border border-gray-200 shadow-sm text-left">
+                        <h3 class="text-2xl font-bold text-indigo-700 mb-3">1. 향상된 논증 검색</h3>
+                        <p class="text-lg text-gray-700">키워드 검색을 넘어 "이 주장을 반박하는 데 사용된 판례는 무엇인가?"와 같은 논증 기반의 개념적 검색을 지원합니다.</p>
+                    </div>
+                    <div class="bg-white p-8 rounded-lg border border-gray-200 shadow-sm text-left">
+                        <h3 class="text-2xl font-bold text-indigo-700 mb-3">2. 지능형 법률 분석</h3>
+                        <p class="text-lg text-gray-700">계약서나 소송 자료에서 잠재적 위험, 누락된 조항, 비일관적인 논리 등 복잡한 패턴을 자동으로 식별하고 분석합니다.</p>
+                    </div>
+                     <div class="bg-white p-8 rounded-lg border border-gray-200 shadow-sm text-left">
+                        <h3 class="text-2xl font-bold text-indigo-700 mb-3">3. 새로운 논증 기회 발견</h3>
+                        <p class="text-lg text-gray-700">기존 판례의 패턴과 다른 '예측 위반' 사례를 식별하여, 아무도 생각지 못했던 새로운 법률 논증의 가능성을 제시합니다.</p>
+                    </div>
+                </div>
+
+                <p class="mt-12 text-lg text-gray-800 font-semibold">결론적으로, 잘 설계된 데이터 전략은 법률 AI를 단순한 정보 검색 도구에서 진정한 '추론 증강(Reasoning Augmentation)' 도구로 발전시키는 열쇠입니다.</p>
+            </div>
+        </section>
+
+    </main>
+    
+    <!-- Navigation Buttons -->
+    <button id="prevBtn" class="nav-button" style="display: none;">이전</button>
+    <button id="nextBtn" class="nav-button">다음</button>
+
+    <!-- Modal -->
+    <div id="modal" class="modal-overlay">
+        <div id="modal-content" class="modal-content">
+            <!-- Modal content will be injected by JS -->
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- DATA ---
+    const modelsData = [
+        { 
+            name: 'HYPO & CATO', 
+            type: '사례 기반 추론',
+            description: '판례를 사실 패턴의 집합인 \'법률 요소(Legal Factors)\'로 표현하여, 새로운 사건과 비교하고 유추/구별하는 3단 논증을 생성합니다. 법률 추론의 기초적인 형태를 모델링했습니다.',
+            contribution: '법률 요소를 통해 판례를 구조화하고 비교하는 방법론을 제시했습니다.'
+        },
+        { 
+            name: 'GREBE', 
+            type: '예시 기반 설명',
+            description: '판례를 의미론적 네트워크로 표현하고, 판결 이유(EBEs)를 새로운 사건에 매핑하여 논증을 생성합니다. 더 깊은 의미론적 연결을 시도했습니다.',
+            contribution: '단순한 요소 비교를 넘어 판결의 근거가 되는 구조를 매핑하려 했습니다.'
+        },
+        { 
+            name: 'Carneades & VJAP', 
+            type: '법률 논증 모델',
+            description: 'P와 ~P에 대한 상충하는 논증을 동시에 처리하고, 증명 기준, 논증 스키마, 그리고 법의 근본적인 \'가치\'와 \'정책\'까지 고려하여 결과를 예측합니다.',
+            contribution: '법률 추론의 비단조성, 불확정성, 목적론적 측면을 정교하게 모델링했습니다.'
+        },
+        { 
+            name: 'DLF', 
+            type: '증거 추론 모델',
+            description: '법령의 요구사항을 \'규칙 트리\'로 표현하고, 증거에서부터 최종 사실 인정까지의 추론 사슬을 추적합니다. 증거법 분야의 논증을 모델링하는 데 특화되었습니다.',
+            contribution: '복잡한 법규와 증거 사이의 논리적 연결을 시각화하고 추적하는 방법을 제시했습니다.'
+        }
+    ];
+
+    const taggingChallengesData = {
+        '데이터 희소성': {
+            description: '특정 법률 범주나 논증 유형에 대한 학습 데이터가 부족한 문제입니다.',
+            solution: '여러 관할권의 데이터를 결합하여 데이터셋을 확장하고, 인간 전문가의 피드백을 통해 반복적으로 모델을 훈련시키는 예측 코딩(Predictive Coding) 기법을 활용합니다.'
+        },
+        '모호성': {
+            description: '법률 용어의 의미(의미론적)나 문장 구조(구문론적)가 여러 방식으로 해석될 수 있는 문제입니다.',
+            solution: '법령 정규화 프로세스를 도입하고, LUIMA와 같은 유형 시스템으로 텍스트의 의미를 명확히 주석 처리하여 모델의 이해도를 높입니다.'
+        },
+        '귀속 및 극성': {
+            description: '문장의 주체(판사, 원고, 증인 등)를 파악하고, 해당 주장이 결론에 찬성하는지(Pro) 반대하는지(Con) 구별하는 문제입니다.',
+            solution: '담론 모델을 개발하여 문장 간의 관계와 행위자를 파악하고, 지도 학습(Supervised ML)을 통해 주장의 극성을 분류하는 모델을 훈련시킵니다.'
+        }
+    };
+
+    const chartData = {
+        labels: ['법률 규칙/판결', '증거 및 사실 발견', '정책/가치 기반 추론', '절차적 사실/인용', '중간 추론 과정'],
+        datasets: [{
+            label: '논증 구조 구성 비율',
+            data: [25, 35, 15, 10, 15],
+            backgroundColor: [
+                'rgba(79, 70, 229, 0.7)',
+                'rgba(30, 64, 175, 0.7)',
+                'rgba(147, 51, 234, 0.7)',
+                'rgba(107, 114, 128, 0.7)',
+                'rgba(37, 99, 235, 0.7)',
+            ],
+            borderColor: [
+                'rgba(79, 70, 229, 1)',
+                'rgba(30, 64, 175, 1)',
+                'rgba(147, 51, 234, 1)',
+                'rgba(107, 114, 128, 1)',
+                'rgba(37, 99, 235, 1)',
+            ],
+            borderWidth: 1
+        }]
+    };
+
+    // --- STATE ---
+    let currentSection = 1;
+    const totalSections = 5;
+    let luimaChartInstance = null;
+
+    // --- DOM ELEMENTS ---
+    const sections = document.querySelectorAll('.section');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const modelsContainer = document.getElementById('models-container');
+    const modal = document.getElementById('modal');
+    const modalContent = document.getElementById('modal-content');
+    const challengesContainer = document.getElementById('tagging-challenges-container');
+    const challengeContentEl = document.getElementById('challenge-content');
+
+    // --- FUNCTIONS ---
+
+    function updateNavButtons() {
+        prevBtn.style.display = currentSection === 1 ? 'none' : 'block';
+        nextBtn.style.display = currentSection === totalSections ? 'none' : 'block';
+    }
+
+    function showSection(sectionIndex) {
+        sections.forEach((section, index) => {
+            if (index + 1 === sectionIndex) {
+                section.classList.add('active');
+                if (section.id === 'section-4' && !luimaChartInstance) {
+                    renderLuimaChart();
+                }
+            } else {
+                section.classList.remove('active');
+            }
+        });
+        
+        const targetSection = document.getElementById(`section-${sectionIndex}`);
+        if (targetSection) {
+            targetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        updateNavButtons();
+    }
+
+    function populateModels() {
+        modelsData.forEach(model => {
+            const card = document.createElement('div');
+            card.className = 'card bg-white p-6 rounded-lg shadow-md cursor-pointer text-left';
+            card.innerHTML = `
+                <h3 class="text-xl font-bold text-indigo-800 mb-2">${model.name}</h3>
+                <p class="text-md font-semibold text-gray-600">${model.type}</p>
+            `;
+            card.addEventListener('click', () => showModal(model));
+            modelsContainer.appendChild(card);
+        });
+    }
+
+    function showModal(model) {
+        modalContent.innerHTML = `
+            <h2 class="text-3xl font-bold text-indigo-800 mb-4">${model.name}</h2>
+            <p class="text-lg font-semibold text-gray-700 mb-4">${model.type}</p>
+            <p class="text-lg text-gray-600 mb-6">${model.description}</p>
+            <div class="bg-indigo-50 p-4 rounded-md">
+                <h4 class="font-bold text-indigo-900">핵심 기여:</h4>
+                <p class="text-gray-800">${model.contribution}</p>
+            </div>
+            <button id="closeModalBtn" class="mt-8 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">닫기</button>
+        `;
+        modal.classList.add('visible');
+        document.getElementById('closeModalBtn').addEventListener('click', () => modal.classList.remove('visible'));
+    }
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('visible');
+        }
+    });
+
+    function renderLuimaChart() {
+        const ctx = document.getElementById('luimaChart').getContext('2d');
+        luimaChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: false,
+                        text: '가상 법률 문서의 논증 구조'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.parsed + '%';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            },
+        });
+    }
+
+    function populateTaggingChallenges() {
+        const buttonContainer = challengesContainer.querySelector('.flex');
+        Object.keys(taggingChallengesData).forEach((key, index) => {
+            const button = document.createElement('button');
+            button.textContent = key;
+            button.className = `px-4 py-2 rounded-full text-sm font-medium transition ${index === 0 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+            button.addEventListener('click', () => {
+                updateChallengeContent(key);
+                // Update button styles
+                buttonContainer.querySelectorAll('button').forEach(btn => {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                });
+                button.classList.add('bg-indigo-600', 'text-white');
+                button.classList.remove('bg-gray-200', 'text-gray-700');
+            });
+            buttonContainer.appendChild(button);
+        });
+        updateChallengeContent(Object.keys(taggingChallengesData)[0]); // Show first challenge by default
+    }
+
+    function updateChallengeContent(challengeKey) {
+        const data = taggingChallengesData[challengeKey];
+        challengeContentEl.innerHTML = `
+            <h4 class="text-xl font-bold text-indigo-800 mb-3">과제: ${challengeKey}</h4>
+            <p class="text-gray-600 mb-4">${data.description}</p>
+            <div class="border-t pt-4">
+                <h5 class="font-semibold text-gray-800">해결 전략:</h5>
+                <p class="text-gray-600">${data.solution}</p>
+            </div>
+        `;
+    }
+
+    // --- EVENT LISTENERS ---
+    prevBtn.addEventListener('click', () => {
+        if (currentSection > 1) {
+            currentSection--;
+            showSection(currentSection);
+        }
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentSection < totalSections) {
+            currentSection++;
+            showSection(currentSection);
+        }
+    });
+    
+    document.addEventListener('keydown', (e) => {
+        if (modal.classList.contains('visible')) {
+            if (e.key === 'Escape') {
+                 modal.classList.remove('visible');
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowRight' && currentSection < totalSections) {
+            currentSection++;
+            showSection(currentSection);
+        } else if (e.key === 'ArrowLeft' && currentSection > 1) {
+            currentSection--;
+            showSection(currentSection);
+        }
+    });
+
+
+    // --- INITIALIZATION ---
+    populateModels();
+    populateTaggingChallenges();
+    showSection(1);
+
+});
+</script>
+</body>
+</html>
